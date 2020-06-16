@@ -31,3 +31,4 @@
 *.out
 *.app
 /impedance_control/.idea
+*user
