@@ -1,8 +1,6 @@
 #include "Ctimer.h"
 
-#include <future>
-
-CTimer::CTimer(const std::string sTimerName):m_bExpired(true), m_bTryExpired(false), m_bLoop(false)
+CTimer::CTimer(const string sTimerName):m_bExpired(true), m_bTryExpired(false), m_bLoop(false)
 {
     m_sName = sTimerName;
 }
@@ -13,7 +11,7 @@ CTimer::~CTimer()
     DeleteThread();
 }
 
-bool CTimer::Start(unsigned int msTime, std::function<void()> task, bool bLoop, bool async)
+bool CTimer::Start(unsigned int msTime, function<void()> task, bool bLoop, bool async)
 {
     if (!m_bExpired || m_bTryExpired) return false;  //任务未过期(即内部仍在存在或正在运行任务)
     m_bExpired = false;
@@ -21,21 +19,15 @@ bool CTimer::Start(unsigned int msTime, std::function<void()> task, bool bLoop, 
     m_nCount = 0;
 
     if (async) {
-        cout<<"异步"<<endl;
         DeleteThread();
-        cout<<"创建子线程"<<endl;
-        m_Thread = new std::thread([this, msTime, task]() {
-            cout<<"进入lamda函数"<<endl;
+        m_Thread = new thread([this, msTime, task]() {
             while (!m_bTryExpired) {
-                cout<<"任务没过期1"<<endl;
-                m_ThreadCon.wait_for(m_ThreadLock, std::chrono::milliseconds(msTime));  //休眠
+                m_ThreadCon.wait_for(m_ThreadLock, chrono::milliseconds(msTime));  //休眠
                 if (!m_bTryExpired) {
-                    cout<<"任务没过期2"<<endl;
                     task();     //执行任务
 
                     m_nCount ++;
                     if (!m_bLoop) {
-                        cout<<"结束循环"<<endl;
                         break;
                     }
                 }
@@ -45,16 +37,13 @@ bool CTimer::Start(unsigned int msTime, std::function<void()> task, bool bLoop, 
             m_bTryExpired = false;  //为了下次再次装载任务
         });
     } else {
-        cout<<"不是异步"<<endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(msTime));
+        this_thread::sleep_for(chrono::milliseconds(msTime));
         if (!m_bTryExpired) {
-            cout<<"任务没过期"<<endl;
             task();
         }
         m_bExpired = true;
         m_bTryExpired = false;
     }
-
     return true;
 }
 

@@ -4,33 +4,22 @@
 #include <iostream>
 #include <vector>
 #include<sys/time.h>
+#include <thread>
+#include <mutex>
+#include "Ctimer.h"
+#include "ros/ros.h"
 
+#include "std_msgs/Float32MultiArray.h"
+#include "std_msgs/Bool.h"
 using namespace std;
 
-class BaseTimerTask
-{
-public:
-    BaseTimerTask():m_uiTvSec(0),m_uiTvUsec(0){}
-    virtual ~BaseTimerTask(){}
-public:
-    //设置定时器间隔
-    void setTimer(uint uiTvSec,uint uiTvUsec = 0);
-
-    //启动定时器
-    void startTimer(uint uiTvSec,uint uiTvUsec = 0);
-
-    //周期性任务
-    virtual void intervalTask()= 0;
-
-private:
-    uint m_uiTvSec;           //秒
-    uint m_uiTvUsec;          //微秒
-};
-
+enum RW_level {READ=0,WRITE};
 
 class impedance {
+public:
+    impedance(ros::NodeHandle* node);
 private:
-    //M参数
+    //M参数 轴数对应:X,Y,Z,Pitch,Yaw,Roll
     const float M_param[6]{1.6,1.6,3.2,0.4,0.3,0.2};
     //B参数
     const float B_param[6]{4.8,4.8,3.6,1.6,1.2,0.6};
@@ -44,12 +33,38 @@ private:
     float curVel[6]{0};
     //插补周期
     float T=0.004;
+    //加锁后拷贝数据
+    float lock_robCurPose[6];
+    CTimer *pTimer;
+    thread *m_Thread = nullptr;
+    mutex mutex1;
+    bool flag_start= false;
+
+    //ros对象
+    ros::NodeHandle* Node;
+    ros::Publisher PubPose_moveRob;//发布机器人下一步执行运动点位
+    ros::Subscriber SubRobPose;    //接收机器人当前点位数据
+    ros::Subscriber SubCommand_begin; //接受启动和停止命令
+    ros::Subscriber SubForceSensor;  //接受传感器数据
+
 private:
-    //发布下一点坐标
-    void pubNextPose();
     //根据当前机器人坐标数据与力矩传感器数据预测下一步机器人坐标,0.004s发布一次
-    //阻抗控制 f(t)=ma+bv
     float* forecastNextPose();
+
+    void Subcallback_begin(std_msgs::Bool msg);
+
+    void Subcallback_ReceivePose(std_msgs::Float32MultiArray msg);
+
+    void Subcallback_ForceSensor(std_msgs::Float32MultiArray msg);
+
+    void test_thread();
+
+    //读写机器人当前位置时加锁
+    float* readAndWrite_robCurPose(RW_level lev,float* data= nullptr);
+
+    void test_read();
+
+    void test_write();
 
 };
 
