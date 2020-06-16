@@ -62,10 +62,6 @@ private:
     //读写机器人当前位置时加锁
     float* readAndWrite_robCurPose(RW_level lev,float* data= nullptr);
 
-    void test_read();
-
-    void test_write();
-
 };
 
 

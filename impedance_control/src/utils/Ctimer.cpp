@@ -22,7 +22,7 @@ bool CTimer::Start(unsigned int msTime, function<void()> task, bool bLoop, bool 
         DeleteThread();
         m_Thread = new thread([this, msTime, task]() {
             while (!m_bTryExpired) {
-                m_ThreadCon.wait_for(m_ThreadLock, chrono::milliseconds(msTime));  //休眠
+                m_ThreadCon.wait_for(m_ThreadLock, chrono::microseconds(msTime));  //休眠
                 if (!m_bTryExpired) {
                     task();     //执行任务
 
@@ -37,7 +37,7 @@ bool CTimer::Start(unsigned int msTime, function<void()> task, bool bLoop, bool 
             m_bTryExpired = false;  //为了下次再次装载任务
         });
     } else {
-        this_thread::sleep_for(chrono::milliseconds(msTime));
+        this_thread::sleep_for(chrono::microseconds(msTime));
         if (!m_bTryExpired) {
             task();
         }
