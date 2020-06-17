@@ -11,7 +11,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   hirop_msgs
 )
+
 find_package(soem REQUIRED)
+
+
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -115,7 +118,7 @@ find_package(soem REQUIRED)
 include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
-  ${soem_INCLUDE_DIRS}/soem
+${soem_INCLUDE_DIRS}/soem
 )
 
 ## Declare a C++ library
@@ -146,7 +149,7 @@ add_executable(daq_driver src/driver.cpp)
 ## Specify libraries to link a library or executable target against
 target_link_libraries(daq_driver
    ${catkin_LIBRARIES}
-   /usr/local/lib/libsoem.a
+ /usr/local/lib/libsoem.a
    pthread
 )
 

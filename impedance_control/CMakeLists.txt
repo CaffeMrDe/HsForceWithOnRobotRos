@@ -57,7 +57,6 @@ LINK_DIRECTORIES(
 add_executable(impedance_control
         src/impedance_control.cpp
         src/utils/impedance.cpp
-        src/utils/timerTask.cpp
         src/utils/Ctimer.cpp
         src/robot/hsRobotUtil.cpp
         )

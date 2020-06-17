@@ -2,47 +2,76 @@
 
 impedance::impedance(ros::NodeHandle* node):Node(node) {
     //控制阻抗模块启动或停止
-    SubCommand_begin=Node->subscribe<std_msgs::Bool>("imp_begin",1,&impedance::Subcallback_begin,this);
-    //接收机器人当前位置点
-    SubRobPose=Node->subscribe<std_msgs::Float32MultiArray>("Pose_receive",1,&impedance::Subcallback_ReceivePose,this);
+    SubCommand_begin=Node->subscribe<std_msgs::Bool>("ShakeHandRobot_ctrlCommand",1,&impedance::Subcallback_begin,this);
     //接收力矩传感器数据
-    SubForceSensor=Node->subscribe<std_msgs::Float32MultiArray>("data_ForceSensor",1,&impedance::Subcallback_ForceSensor,this);
+    SubForceSensor=Node->subscribe<geometry_msgs::Wrench>("daq_data",1000,&impedance::Subcallback_ForceSensor,this);
     //发布机器人目标执行点
     PubPose_moveRob=Node->advertise<std_msgs::Float32MultiArray>("Pose_moveRob", 1);
     //创建定时器
-    pTimer = new CTimer("timer");
-    m_Thread=new thread(&impedance::test_thread,this);
-
+    pTimer_bringup = new CTimer("pTimer_bringup");
+    pTimer_getRobPose = new CTimer("pTimer_getRobPose");
+    pTimer_shakeHandCount = new CTimer("pTimer_shakeHandCount");
+    pTimer_10S = new CTimer("pTimer_10S");
+    flag_connRob = hsrobot.connectRobot();
+    if(!flag_connRob){
+        cout<<"机器人未连接"<<endl;
+    }
 }
 
 //启动或停止命令
 void impedance::Subcallback_begin(std_msgs::Bool msg) {
+    //开始启动命令
     if(msg.data){
-        pTimer->AsyncLoop(3780,&impedance::forecastNextPose,this);//频率为250hz
-    } else{
-        pTimer->Cancel();
+        cout<<"启动"<<endl;
+        pTimer_bringup->AsyncLoop(SLEEP_TIME,&impedance::forecastNextPose,this);//频率为250hz
+        pTimer_getRobPose->AsyncLoop(SLEEP_TIME,&impedance::Thread_RecvRobPose,this);//频率为250hz
+    }
+    //停止命令
+    else{
+        pTimer_bringup->Cancel();
     }
 }
-//接收机器人当前点位数据
-void impedance::Subcallback_ReceivePose(std_msgs::Float32MultiArray msg) {
-    for (int i = 0; i < msg.data.size(); ++i) {
-        robCurPose[i]=msg.data[i];
+//获取机器人当前点位数据
+void impedance::Thread_RecvRobPose() {
+    if(!flag_connRob){
+        return;
     }
+    cout<<"获取机器人当前点位数据"<<endl;
+    mutex_shareRobPose.lock();
+    hsrobot.getRobotCurPos(posM_robCurPose);
+    mutex_shareRobPose.unlock();
 }
 
 //接收力矩传感器数据
-void impedance::Subcallback_ForceSensor(std_msgs::Float32MultiArray msg) {
-    for (int i = 0; i < msg.data.size(); ++i) {
-        forceSensor[i]=msg.data[i];
-    }
+void impedance::Subcallback_ForceSensor(geometry_msgs::Wrench msg) {
+    cout<<"获取力传感器数据"<<endl;
+        mutex_shareForceSensor.lock();
+        forceSensor[0]=msg.force.x;
+        forceSensor[1]=msg.force.y;
+        forceSensor[2]=msg.force.z;
+        forceSensor[3]=msg.torque.x;
+        forceSensor[4]=msg.torque.y;
+        forceSensor[5]=msg.torque.z;
+        mutex_shareForceSensor.unlock();
+        //任意XYZ方向受力大于1N,表示有效握手开始,并计数
+        if((abs(forceSensor[0])>1)||(abs(forceSensor[1])>1)||(abs(forceSensor[2])>1)){
+            pTimer_shakeHandCount->AsyncLoop(SLEEP_TIME,&impedance::culculate_shakeHand,this);
+        }
 }
 
-float* impedance::forecastNextPose() {
+void impedance::forecastNextPose() {
+    mutex_shareRobPose.lock();
+    for (int k = 0; k < 6; ++k) {
+        robCurPose[k]=posM_robCurPose.data[k];
+    }
+    mutex_shareRobPose.unlock();
     //加速度计算
     float acc[6];
+    mutex_shareForceSensor.lock();
     for (int i = 0; i < 6; ++i) {
         acc[i]=(forceSensor[i]-B_param[i]*curVel[i])/M_param[i];
     }
+    mutex_shareForceSensor.unlock();
     //加速度限制
     for (int i = 0; i < 6; ++i){
         if(abs(acc[i])>0.5){
@@ -59,7 +88,7 @@ float* impedance::forecastNextPose() {
     }
     //速度更新? 还是改为平均速度更新
     for (int i = 0; i < 6; ++i) {
-        curVel[i]=acc[i]*T;
+        curVel[i]=curVel[i]+acc[i]*T;
     }
     //速度限制
     for (int i = 0; i < 3; ++i){
@@ -85,46 +114,50 @@ float* impedance::forecastNextPose() {
     for (int j = 0; j < 6; ++j) {
         msg.data[j]=robNextPose[j];
     }
-    cout<<"发布中"<<endl;
     PubPose_moveRob.publish(msg);
+//    cout<<"发布中"<<endl;
+    if(!flag_connRob){
+        return;
+    }
+    copy(begin(posM_robNextPose.data),begin(posM_robNextPose.data)+6,robNextPose);
+    hsrobot.setRobotPosition(posM_robNextPose);
 }
 
-//测试线程,发布频率为250HZ
-void impedance::test_thread() {
-    while (true){
-        usleep(1000*1000);
-        while (flag_start){
-            usleep(3780);
-            forecastNextPose();
+//计算握手次数
+void impedance::culculate_shakeHand() {
+    //1.接受开始计算命令(表示有外力数据输入)
+    if(!flag_statCount){
+        return;
+    }
+    //2.采集机器人当前数据
+    double tmp_RbPose[3]{0};
+    mutex_shareRobPose.lock();
+    copy(begin(posM_robCurPose.data),begin(posM_robCurPose.data)+3,tmp_RbPose);
+    mutex_shareRobPose.unlock();
+    //3.记录初值并初始化
+    if(!sh_data.recordInitPose){
+        sh_data={true,{0},{0},0,0};
+        copy(begin(tmp_RbPose),begin(tmp_RbPose)+3,sh_data.initPose);
+        copy(begin(tmp_RbPose),begin(tmp_RbPose)+3,sh_data.CurPose);
+    }
+    //4.记录最大距离或最小值
+    double tmp_Distance=pow((tmp_RbPose[0]-sh_data.CurPose[0]),2)+pow((tmp_RbPose[1]-sh_data.CurPose[1]),2)+pow((tmp_RbPose[2]-sh_data.CurPose[2]),2);
+    copy(begin(tmp_RbPose),begin(tmp_RbPose)+3,sh_data.CurPose);
+    if(tmp_Distance>sh_data.MaxDistance){
+        sh_data.MaxDistance=tmp_Distance;
+        sh_data.MinDistance=tmp_Distance;
+    } else{
+        if(tmp_Distance<sh_data.MinDistance){
+            sh_data.MinDistance=tmp_Distance;
         }
     }
-}
-
-float *impedance::readAndWrite_robCurPose(RW_level lev,float* data) {
-    mutex1.lock();
-    if(lev==RW_level::READ){
-        copy(begin(robCurPose),end(robCurPose),lock_robCurPose);
-    }
-    if(lev==RW_level::WRITE){
-        for (int i = 0; i < 6; ++i) {
-            robCurPose[i]=data[i];
-        }
+    //5.判断是否完成一次握手
+    if(sh_data.MaxDistance>50&&sh_data.MinDistance<10){
+        count_shakeHand++;
+        //数据初始化
+        sh_data={false,{0},{0},0,0};
+        flag_statCount= false;
+        pTimer_shakeHandCount->Cancel();
     }
 
-    return nullptr;
 }
-
-////测试多线程读写数据问题,当读写过快时会出现数据错误现象,需要加锁
-//void impedance::test_read() {
-//    while(true)
-//    {
-//        usleep(2);
-//        if(robCurPose[0]!=robCurPose[1]){
-//            cout<<"读入错误"<<endl;
-//            cout<<robCurPose[0]<<"--"<<robCurPose[1]<<"--"<<robCurPose[2]<<"--"<<robCurPose[3]<<"--"<<robCurPose[4]<<"--"<<robCurPose[5]<<"--"<<endl;
-//        }
-
-
-
-
-
