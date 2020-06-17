@@ -12,18 +12,14 @@ impedance::impedance(ros::NodeHandle* node):Node(node) {
     //创建定时器
     pTimer = new CTimer("timer");
     m_Thread=new thread(&impedance::test_thread,this);
-//    thread* m1_Thread=new thread(&impedance::test_read,this);
-//    thread* m2_Thread=new thread(&impedance::test_write,this);
+
 }
 
 //启动或停止命令
 void impedance::Subcallback_begin(std_msgs::Bool msg) {
     if(msg.data){
-        flag_start= true;
-        cout<<"启动标志"<<endl;
-//        pTimer->AsyncLoop(4,&impedance::forecastNextPose,this);//频率为236.4
+        pTimer->AsyncLoop(3780,&impedance::forecastNextPose,this);//频率为250hz
     } else{
-        flag_start= false;
         pTimer->Cancel();
     }
 }
@@ -127,22 +123,6 @@ float *impedance::readAndWrite_robCurPose(RW_level lev,float* data) {
 //            cout<<"读入错误"<<endl;
 //            cout<<robCurPose[0]<<"--"<<robCurPose[1]<<"--"<<robCurPose[2]<<"--"<<robCurPose[3]<<"--"<<robCurPose[4]<<"--"<<robCurPose[5]<<"--"<<endl;
 //        }
-//
-//    }
-//}
-//
-//void impedance::test_write() {
-//    int a=0;
-//    while(true)
-//    {
-//        a++;
-//        usleep(1);
-//        for (int i = 0; i < 6; ++i) {
-//            robCurPose[i]=a;
-//        }
-//
-//    }
-//}
 
 
 

@@ -45,13 +45,14 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-LINK_DIRECTORIES(
-    ~/catkin_ws/src/HsForceWithOnRobotRos/impedance_control/3rd/lib/HsApi
-    ~/catkin_ws/src/HsForceWithOnRobotRos/impedance_control/3rd/lib/boost_linux64)
 include_directories(
     include
-    ~/catkin_ws/src/HsForceWithOnRobotRos/impedance_control/3rd/include
+    3rd/include
 )
+
+LINK_DIRECTORIES(
+        3rd/lib/HsApi
+        3rd/lib/boost_linux64)
 
 add_executable(impedance_control
         src/impedance_control.cpp
