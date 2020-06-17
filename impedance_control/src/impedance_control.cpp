@@ -4,7 +4,7 @@
 using namespace std;
 
 
-
+#include <hsRobotUtil.h>
 int main(int args,char** argv){
     //ros节点
     std::string nodeName = "impedance_control";
@@ -17,3 +17,5 @@ int main(int args,char** argv){
     ros::spin();
     return 0;
 }
+
+

@@ -39,3 +39,13 @@ bool hsRobotUtil::getConnect()
     }
     return ret == 0? true :false;
 }
+
+//#define BOOST_TEST_MODULE test0
+//#include <boost/test/included/unit_test.hpp>
+//BOOST_AUTO_TEST_SUITE ( test )
+//BOOST_AUTO_TEST_CASE( test )
+//{
+//  hsRobotUtil b;
+//  BOOST_CHECK(true == b.connectRobot());
+//}
+//BOOST_AUTO_TEST_SUITE_END( )
