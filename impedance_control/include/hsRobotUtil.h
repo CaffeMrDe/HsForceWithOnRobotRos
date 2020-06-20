@@ -8,7 +8,8 @@
 
 using namespace Hsc3::Comm;
 using namespace Hsc3::Proxy;
-#define IPADDR "10.10.56.214"
+//#define IPADDR "10.10.56.214"
+#define IPADDR "10.10.57.215"
 #define PORT 23234
 
 struct posMotion{

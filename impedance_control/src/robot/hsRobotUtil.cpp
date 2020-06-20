@@ -1,6 +1,7 @@
 #include "hsRobotUtil.h"
 #include "vector"
 #include "algorithm"
+#include "iostream"
 hsRobotUtil::hsRobotUtil() {
         commn = std::make_shared<CommApi>();
         proxyV = std::make_shared<ProxyVar>(commn.get());
@@ -27,7 +28,12 @@ void hsRobotUtil::getRobotCurPos(posMotion &pdata)
 
 bool hsRobotUtil::connectRobot()
 {
+//    if(getConnect()){
+//        return  true;
+//    }
+
     int ret = commn->connect(IPADDR,PORT);
+    std::cout <<(ret  ) <<std::endl;
     return ret == 0? true :false;
 }
 

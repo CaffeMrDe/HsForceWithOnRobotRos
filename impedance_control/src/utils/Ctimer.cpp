@@ -8,7 +8,7 @@ CTimer::CTimer(const string sTimerName):m_bExpired(true), m_bTryExpired(false), 
 CTimer::~CTimer()
 {
     m_bTryExpired = true;   //尝试使任务过期
-    DeleteThread();
+                                                      DeleteThread();
 }
 
 bool CTimer::Start(unsigned int msTime, function<void()> task, bool bLoop, bool async)
@@ -24,7 +24,8 @@ bool CTimer::Start(unsigned int msTime, function<void()> task, bool bLoop, bool 
             while (!m_bTryExpired) {
                 m_ThreadCon.wait_for(m_ThreadLock, chrono::microseconds(msTime));  //休眠
                 if (!m_bTryExpired) {
-                    task();     //执行任务
+
+                     task();     //执行任务
 
                     m_nCount ++;
                     if (!m_bLoop) {
